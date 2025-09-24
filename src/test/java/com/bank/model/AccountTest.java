@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeEach;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.bank.exception.DailyLimitException;
+
 class AccountTest {
 
     private static final String TEST_ACCOUNT_NUMBER = "12345";
@@ -31,7 +33,7 @@ class AccountTest {
     @Test
     @DisplayName("Should create account with valid parameters")
     void shouldCreateAccountWithValidParameters() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         assertEquals(TEST_ACCOUNT_NUMBER, account.getAccountNumber());
         assertEquals(customer, account.getCustomer());
@@ -41,7 +43,7 @@ class AccountTest {
     @Test
     @DisplayName("Should trim account number whitespace")
     void shouldTrimAccountNumberWhitespace() {
-        Account account = new Account("  " + TEST_ACCOUNT_NUMBER + "  ", customer);
+        Account account = new Account("  " + TEST_ACCOUNT_NUMBER + "  ", customer, AccountType.CHECKING);
         
         assertEquals(TEST_ACCOUNT_NUMBER, account.getAccountNumber());
     }
@@ -51,7 +53,7 @@ class AccountTest {
     void shouldThrowExceptionForNullAccountNumber() {
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new Account(null, customer)
+            () -> new Account(null, customer, AccountType.CHECKING)
         );
         assertEquals(ACCOUNT_NUMBER_NULL_OR_EMPTY_ERROR, exception.getMessage());
     }
@@ -61,7 +63,7 @@ class AccountTest {
     void shouldThrowExceptionForEmptyAccountNumber() {
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new Account("", customer)
+            () -> new Account("", customer, AccountType.CHECKING)
         );
         assertEquals(ACCOUNT_NUMBER_NULL_OR_EMPTY_ERROR, exception.getMessage());
     }
@@ -71,7 +73,7 @@ class AccountTest {
     void shouldThrowExceptionForNullCustomer() {
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new Account(TEST_ACCOUNT_NUMBER, null)
+            () -> new Account(TEST_ACCOUNT_NUMBER, null, AccountType.CHECKING)
         );
         assertEquals(CUSTOMER_NULL_ERROR, exception.getMessage());
     }
@@ -79,7 +81,7 @@ class AccountTest {
     @Test
     @DisplayName("Should deposit valid amount")
     void shouldDepositValidAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         Money depositAmount = Money.of("100.50");
         
         account.deposit(depositAmount);
@@ -90,7 +92,7 @@ class AccountTest {
     @Test
     @DisplayName("Should handle multiple deposits")
     void shouldHandleMultipleDeposits() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         account.deposit(Money.of("100.00"));
         account.deposit(Money.of("50.25"));
@@ -101,7 +103,7 @@ class AccountTest {
     @Test
     @DisplayName("Should throw exception for null deposit amount")
     void shouldThrowExceptionForNullDepositAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
@@ -113,7 +115,7 @@ class AccountTest {
     @Test
     @DisplayName("Should throw exception for negative deposit amount")
     void shouldThrowExceptionForNegativeDepositAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
@@ -125,7 +127,7 @@ class AccountTest {
     @Test
     @DisplayName("Should throw exception for zero deposit amount")
     void shouldThrowExceptionForZeroDepositAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
@@ -137,7 +139,7 @@ class AccountTest {
     @Test
     @DisplayName("Should withdraw valid amount")
     void shouldWithdrawValidAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         account.deposit(Money.of("100.00"));
         
         account.withdraw(Money.of("50.00"));
@@ -148,7 +150,7 @@ class AccountTest {
     @Test
     @DisplayName("Should handle multiple withdrawals")
     void shouldHandleMultipleWithdrawals() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         account.deposit(Money.of("200.00"));
         
         account.withdraw(Money.of("50.00"));
@@ -160,7 +162,7 @@ class AccountTest {
     @Test
     @DisplayName("Should throw exception for null withdrawal amount")
     void shouldThrowExceptionForNullWithdrawalAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
@@ -172,7 +174,7 @@ class AccountTest {
     @Test
     @DisplayName("Should throw exception for negative withdrawal amount")
     void shouldThrowExceptionForNegativeWithdrawalAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
@@ -184,7 +186,7 @@ class AccountTest {
     @Test
     @DisplayName("Should throw exception for zero withdrawal amount")
     void shouldThrowExceptionForZeroWithdrawalAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
@@ -196,7 +198,7 @@ class AccountTest {
     @Test
     @DisplayName("Should throw exception for insufficient funds")
     void shouldThrowExceptionForInsufficientFunds() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         account.deposit(Money.of("50.00"));
         
         IllegalArgumentException exception = assertThrows(
@@ -209,7 +211,7 @@ class AccountTest {
     @Test
     @DisplayName("Should withdraw exact balance amount")
     void shouldWithdrawExactBalanceAmount() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         Money amount = Money.of("100.00");
         account.deposit(amount);
         
@@ -221,9 +223,9 @@ class AccountTest {
     @Test
     @DisplayName("Should implement equals based on account number")
     void shouldImplementEqualsBasedOnAccountNumber() {
-        Account account1 = new Account("12345", customer);
-        Account account2 = new Account(TEST_ACCOUNT_NUMBER, new Customer("Jane", "Smith"));
-        Account account3 = new Account(ALTERNATIVE_ACCOUNT_NUMBER, customer);
+        Account account1 = new Account("12345", customer, AccountType.CHECKING);
+        Account account2 = new Account(TEST_ACCOUNT_NUMBER, new Customer("Jane", "Smith"), AccountType.CHECKING);
+        Account account3 = new Account(ALTERNATIVE_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         assertEquals(account1, account2);
         assertNotEquals(account1, account3);
@@ -234,8 +236,8 @@ class AccountTest {
     @Test
     @DisplayName("Should implement hashCode based on account number")
     void shouldImplementHashCodeBasedOnAccountNumber() {
-        Account account1 = new Account("12345", customer);
-        Account account2 = new Account(TEST_ACCOUNT_NUMBER, new Customer("Jane", "Smith"));
+        Account account1 = new Account("12345", customer, AccountType.CHECKING);
+        Account account2 = new Account(TEST_ACCOUNT_NUMBER, new Customer("Jane", "Smith"), AccountType.CHECKING);
         
         assertEquals(account1.hashCode(), account2.hashCode());
     }
@@ -243,7 +245,7 @@ class AccountTest {
     @Test
     @DisplayName("Should maintain correct scale for decimal operations")
     void shouldMaintainCorrectScaleForDecimalOperations() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         
         account.deposit(Money.of("10.1"));
         account.deposit(Money.of("20.23"));
@@ -255,7 +257,7 @@ class AccountTest {
     @Test
     @DisplayName("Should check sufficient funds correctly")
     void shouldCheckSufficientFundsCorrectly() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         account.deposit(Money.of("100.00"));
         
         assertTrue(account.hasSufficientFunds(Money.of("50.00")));
@@ -263,13 +265,24 @@ class AccountTest {
         assertFalse(account.hasSufficientFunds(Money.of("100.01")));
         assertFalse(account.hasSufficientFunds(Money.of("200.00")));
     }
-
     @Test
     @DisplayName("Should format balance correctly")
     void shouldFormatBalanceCorrectly() {
-        Account account = new Account(TEST_ACCOUNT_NUMBER, customer);
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.CHECKING);
         account.deposit(Money.of("123.45"));
         
         assertEquals("$123.45", account.getFormattedBalance());
+    }
+
+    @Test
+    @DisplayName("Should throw DailyLimitException when SAVINGS account withdrawal exceeds daily limit")
+    void shouldThrowDailyLimitExceptionWhenSavingsAccountWithdrawalExceedsDailyLimit() {
+        Account account = new Account(TEST_ACCOUNT_NUMBER, customer, AccountType.SAVINGS);
+        account.deposit(Money.of("1000"));
+
+        DailyLimitException exception = assertThrows(DailyLimitException.class,
+                () -> account.withdraw(Money.of("600")));
+
+        assertEquals("Withdrawal amount exceeds daily limit of $500.00", exception.getMessage());
     }
 }

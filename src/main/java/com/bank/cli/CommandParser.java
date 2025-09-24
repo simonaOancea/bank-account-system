@@ -8,10 +8,13 @@ import java.util.Objects;
 
 public class CommandParser {
 
-	private static final int REQUIRED_ARGS_TWO = 2;
 	private static final int REQUIRED_ARGS_ONE = 1;
+	private static final int REQUIRED_ARGS_TWO = 2;
+	private static final int REQUIRED_ARGS_THREE = 3;
+
 	private static final int FIRST_ARGUMENT_INDEX = 0;
 	private static final int SECOND_ARGUMENT_INDEX = 1;
+	private static final int THIRD_ARGUMENT_INDEX = 2;
 
 	public record ParsedCommand(Command command, List<String> arguments) {
 	}
@@ -39,12 +42,21 @@ public class CommandParser {
 	}
 
 	public BigDecimal parseAmount(String amountStr) {
+		return parseAmount(amountStr, BigDecimal.ZERO, false);
+	}
+
+	public BigDecimal parseAmount(String amountStr, BigDecimal minimumAmount) {
+		return parseAmount(amountStr, minimumAmount, true);
+	}
+
+	private BigDecimal parseAmount(String amountStr, BigDecimal minimumAmount, boolean allowEqual) {
 		if (Objects.isNull(amountStr) || amountStr.trim().isEmpty()) {
 			return null;
 		}
 		try {
 			BigDecimal amount = new BigDecimal(amountStr.trim()).setScale(2, RoundingMode.HALF_UP);
-			return amount.compareTo(BigDecimal.ZERO) > 0 ? amount : null;
+			int comparison = amount.compareTo(minimumAmount);
+			return (allowEqual ? comparison >= 0 : comparison > 0) ? amount : null;
 		} catch (NumberFormatException e) {
 			return null;
 		}
@@ -54,6 +66,13 @@ public class CommandParser {
 		return arguments.size() == REQUIRED_ARGS_TWO &&
 				!arguments.get(FIRST_ARGUMENT_INDEX).trim().isEmpty() &&
 				!arguments.get(SECOND_ARGUMENT_INDEX).trim().isEmpty();
+	}
+
+	boolean isValidNewSavingsAccountCommand(List<String> arguments) {
+		return arguments.size() == REQUIRED_ARGS_THREE &&
+				!arguments.get(FIRST_ARGUMENT_INDEX).trim().isEmpty() &&
+				!arguments.get(SECOND_ARGUMENT_INDEX).trim().isEmpty() &&
+				!arguments.get(THIRD_ARGUMENT_INDEX).trim().isEmpty();
 	}
 
 	boolean isValidDepositCommand(List<String> arguments) {
@@ -71,6 +90,13 @@ public class CommandParser {
 	boolean isValidBalanceCommand(List<String> arguments) {
 		return arguments.size() == REQUIRED_ARGS_ONE &&
 				!arguments.get(FIRST_ARGUMENT_INDEX).trim().isEmpty();
+	}
+
+	boolean isValidTransferCommand(List<String> arguments) {
+		return arguments.size() == REQUIRED_ARGS_THREE &&
+				!arguments.get(FIRST_ARGUMENT_INDEX).trim().isEmpty() &&
+				!arguments.get(SECOND_ARGUMENT_INDEX).trim().isEmpty() &&
+				isValidAmount(arguments.get(THIRD_ARGUMENT_INDEX));
 	}
 
 	private boolean isValidAmount(String amountStr) {

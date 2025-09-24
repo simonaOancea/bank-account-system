@@ -2,6 +2,8 @@ package com.bank.model;
 
 import java.util.Objects;
 
+import com.bank.exception.DailyLimitException;
+
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -22,16 +24,21 @@ public class Account {
     private static final String WITHDRAWAL_AMOUNT_NULL_ERROR = "Withdrawal amount cannot be null";
     private static final String WITHDRAWAL_AMOUNT_POSITIVE_ERROR = "Withdrawal amount must be positive";
     private static final String INSUFFICIENT_FUNDS_ERROR = "Insufficient funds for withdrawal";
+    private static final String DAILY_WITHDRAWAL_LIMIT_EXCEEDED_ERROR = "Withdrawal amount exceeds daily limit of %s";
     
     @EqualsAndHashCode.Include
     private final String accountNumber;
     private final Customer customer;
+    private final AccountType accountType;
+    private final AccountLimits limits;
 
     private Money balance;
 
-    public Account(String accountNumber, Customer customer) {
+    public Account(String accountNumber, Customer customer, AccountType accountType) {
         this.accountNumber = validateAndTrimAccountNumber(accountNumber);
         this.customer = validateCustomer(customer);
+        this.accountType = accountType;
+        this.limits = createLimitsForAccountType(accountType);
         this.balance = Money.ZERO;
     }
 
@@ -65,6 +72,9 @@ public class Account {
         if (amount.isGreaterThan(this.balance)) {
             throw new IllegalArgumentException(INSUFFICIENT_FUNDS_ERROR);
         }
+
+        validateWithdrawalLimits(amount);
+
         this.balance = this.balance.subtract(amount);
     }
     
@@ -83,6 +93,24 @@ public class Account {
      */
     public String getFormattedBalance() {
         return balance.toFormattedString();
+    }
+
+    private AccountLimits createLimitsForAccountType(AccountType accountType) {
+        return switch (accountType) {
+            case SAVINGS -> AccountLimits.forSavingsAccount();
+            case BUSINESS -> AccountLimits.forBusinessAccount();
+            case STUDENT -> AccountLimits.forStudentAccount();
+            default -> AccountLimits.forCheckingAccount();
+        };
+    }
+
+    private void validateWithdrawalLimits(Money amount) {
+        if (Objects.nonNull(limits.getDailyWithdrawalLimit()) &&
+                amount.isGreaterThan(limits.getDailyWithdrawalLimit())) {
+            String errorMessage = String.format(DAILY_WITHDRAWAL_LIMIT_EXCEEDED_ERROR, 
+                                               limits.getDailyWithdrawalLimit().toFormattedString());
+            throw new DailyLimitException(errorMessage);
+        }
     }
     
     private static String validateAndTrimAccountNumber(String accountNumber) {
