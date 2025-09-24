@@ -4,9 +4,11 @@ import java.util.Objects;
 
 public enum Command {
     NEW_ACCOUNT("NewAccount"),
+    NEW_SAVINGS_ACCOUNT("NewSavingsAccount"),
     DEPOSIT("Deposit"),
     WITHDRAW("Withdraw"),
     BALANCE("Balance"),
+    TRANSFER("Transfer"),
     QUIT("Quit");
 
     private final String commandName;

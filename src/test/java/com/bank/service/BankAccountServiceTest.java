@@ -1,11 +1,16 @@
 package com.bank.service;
 
+import com.bank.model.AccountType;
+import com.bank.repository.DailyTransactionRepository;
 import com.bank.repository.inmemory.InMemoryAccountRepository;
 import com.bank.exception.AccountNotFoundException;
+import com.bank.exception.DailyLimitException;
 import com.bank.model.Account;
 import com.bank.model.Customer;
 import com.bank.model.Money;
 import com.bank.repository.AccountRepository;
+import com.bank.repository.inmemory.InMemoryDailyTransactionTrackerRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -46,12 +51,18 @@ class BankAccountServiceTest {
     private AccountNumberGenerator accountNumberGenerator;
 
     private AccountRepository repository;
+    private DailyTransactionRepository dailyTransactionRepository;
     private BankAccountService bankService;
+    private DailyLimitsService dailyLimitsService;
+    private Customer testCustomer;
 
     @BeforeEach
     void setUp() {
         repository = new InMemoryAccountRepository();
-        bankService = new BankAccountService(repository, accountNumberGenerator);
+        dailyTransactionRepository = new InMemoryDailyTransactionTrackerRepository();
+        dailyLimitsService = new DailyLimitsService(dailyTransactionRepository);
+        bankService = new BankAccountService(repository, accountNumberGenerator, dailyLimitsService);
+        testCustomer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
     }
 
     @Test
@@ -59,7 +70,7 @@ class BankAccountServiceTest {
     void shouldThrowExceptionForNullAccountNumberGenerator() {
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new BankAccountService(repository, null)
+            () -> new BankAccountService(repository, null, dailyLimitsService)
         );
         assertEquals(ACCOUNT_NUMBER_GENERATOR_NULL_ERROR, exception.getMessage());
     }
@@ -68,9 +79,8 @@ class BankAccountServiceTest {
     @DisplayName("Should create new account successfully")
     void shouldCreateNewAccountSuccessfully() {
         when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
-        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
         
-        String accountNumber = bankService.openAccount(customer, null);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING, null);
         
         assertNotNull(accountNumber);
         assertEquals(TEST_ACCOUNT_NUMBER, accountNumber);
@@ -87,8 +97,7 @@ class BankAccountServiceTest {
     @DisplayName("Should deposit money to existing account")
     void shouldDepositMoneyToExistingAccount() {
         when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
-        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
-        String accountNumber = bankService.openAccount(customer, null);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
         Money depositAmount = Money.of(AMOUNT_100_50);
         
         Money newBalance = bankService.deposit(accountNumber, depositAmount);
@@ -101,8 +110,7 @@ class BankAccountServiceTest {
     @DisplayName("Should withdraw money from existing account")
     void shouldWithdrawMoneyFromExistingAccount() {
         when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
-        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
-        String accountNumber = bankService.openAccount(customer, null);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
         bankService.deposit(accountNumber, Money.of(AMOUNT_200_00));
         Money withdrawAmount = Money.of(AMOUNT_50_75);
         
@@ -117,8 +125,7 @@ class BankAccountServiceTest {
     @DisplayName("Should get balance for existing account")
     void shouldGetBalanceForExistingAccount() {
         when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
-        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
-        String accountNumber = bankService.openAccount(customer, null);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
         Money depositAmount = Money.of(AMOUNT_75_25);
         bankService.deposit(accountNumber, depositAmount);
         
@@ -161,8 +168,7 @@ class BankAccountServiceTest {
     @DisplayName("Should get account by account number")
     void shouldGetAccountByAccountNumber() {
         when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
-        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
-        String accountNumber = bankService.openAccount(customer, null);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
         
         Account retrievedAccount = bankService.getAccount(accountNumber);
         
@@ -195,8 +201,7 @@ class BankAccountServiceTest {
     @DisplayName("Should handle whitespace in account numbers")
     void shouldHandleWhitespaceInAccountNumbers() {
         when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
-        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
-	    bankService.openAccount(customer, null);
+	    bankService.openAccount(testCustomer, AccountType.CHECKING, null);
 
 	    Account account = bankService.getAccount(ACCOUNT_NUMBER_WITH_WHITESPACE);
         
@@ -207,8 +212,7 @@ class BankAccountServiceTest {
     @DisplayName("Should check if account exists")
     void shouldCheckIfAccountExists() {
         when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
-        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
-        String accountNumber = bankService.openAccount(customer, null);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
         
         assertTrue(bankService.accountExists(accountNumber));
         assertFalse(bankService.accountExists(NON_EXISTENT_ACCOUNT_NUMBER));
@@ -225,12 +229,11 @@ class BankAccountServiceTest {
         
         assertEquals(0, bankService.getAccountCount());
         
-        Customer customer1 = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
-        bankService.openAccount(customer1, null);
+        bankService.openAccount(testCustomer, AccountType.CHECKING, null);
         assertEquals(1, bankService.getAccountCount());
         
         Customer customer2 = new Customer(ALTERNATIVE_FIRST_NAME, ALTERNATIVE_LAST_NAME);
-        bankService.openAccount(customer2, null);
+        bankService.openAccount(customer2, AccountType.CHECKING,  null);
         assertEquals(2, bankService.getAccountCount());
     }
 
@@ -238,8 +241,7 @@ class BankAccountServiceTest {
     @DisplayName("Should handle concurrent operations safely")
     void shouldHandleConcurrentOperationsSafely() {
         when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
-        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
-        String accountNumber = bankService.openAccount(customer, null);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
         
         bankService.deposit(accountNumber, Money.of(AMOUNT_1000_00));
         
@@ -269,4 +271,310 @@ class BankAccountServiceTest {
         assertTrue(finalBalance.isGreaterThanOrEqualTo(Money.ZERO));
         assertTrue(finalBalance.isLessThanOrEqualTo(Money.of(AMOUNT_1000_00)));
     }
+
+    @Test
+    @DisplayName("Should transfer money between existing accounts")
+    void shouldTransferMoneyBetweenExistingAccounts() {
+        // Given: Two accounts with known balances
+        when(accountNumberGenerator.generateAccountNumber())
+            .thenReturn(TEST_ACCOUNT_NUMBER)
+            .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        
+        bankService.deposit(fromAccountNumber, Money.of("200.00"));
+        bankService.deposit(toAccountNumber, Money.of("100.00"));
+        
+        Money transferAmount = Money.of("75.00");
+
+        // When: Transfer from one account to another through the service
+        bankService.transfer(fromAccountNumber, toAccountNumber, transferAmount);
+
+        // Then: both balances should be updated correctly
+        assertEquals(Money.of("125.00"), bankService.getBalance(fromAccountNumber));
+        assertEquals(Money.of("175.00"), bankService.getBalance(toAccountNumber));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when transferring to non-existent account")
+    void shouldThrowExceptionWhenTransferringFromNonExistingAccount() {
+        // Given: One existing account and one non-existing account
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER);
+
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING, null);
+        bankService.deposit(fromAccountNumber, Money.of("200.00"));
+
+        Money transferAmount = Money.of("75.00");
+
+        // When & Then: Transfer should throw AccountNotFoundException
+        AccountNotFoundException exception = assertThrows(
+                AccountNotFoundException.class,
+                () -> bankService.transfer(fromAccountNumber, NON_EXISTENT_ACCOUNT_NUMBER, transferAmount)
+        );
+        assertEquals(ACCOUNT_NOT_FOUND_ERROR_PREFIX + NON_EXISTENT_ACCOUNT_NUMBER, exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when transferring from non-existent account")
+    void shouldThrowExceptionWhenTransferringFromNonExistentAccount() {
+        when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING, null);
+        Money transferAmount = Money.of("75.00");
+
+        AccountNotFoundException exception = assertThrows(
+                AccountNotFoundException.class,
+                () -> bankService.transfer(NON_EXISTENT_ACCOUNT_NUMBER, toAccountNumber, transferAmount)
+        );
+        assertEquals(ACCOUNT_NOT_FOUND_ERROR_PREFIX + NON_EXISTENT_ACCOUNT_NUMBER, exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when transferring with insufficient funds")
+    void shouldThrowExceptionWhenTransferringWithInsufficientFunds() {
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER)
+                .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        bankService.deposit(fromAccountNumber, Money.of("50.00"));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> bankService.transfer(fromAccountNumber, toAccountNumber, Money.of("100.00"))
+        );
+        assertEquals("Insufficient funds for transfer", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when transferring to same account")
+    void shouldThrowExceptionWhenTransferringToSameAccount() {
+        when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        bankService.deposit(accountNumber, Money.of("100.00"));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> bankService.transfer(accountNumber, accountNumber, Money.of("50.00"))
+        );
+        assertEquals("Cannot transfer to the same account", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception for null from account in transfer")
+    void shouldThrowExceptionForNullFromAccountInTransfer() {
+        when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> bankService.transfer(null, toAccountNumber, Money.of("50.00"))
+        );
+        assertEquals("From account number cannot be null or empty", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception for null to account in transfer")
+    void shouldThrowExceptionForNullToAccountInTransfer() {
+        when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        bankService.deposit(fromAccountNumber, Money.of("100.00"));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> bankService.transfer(fromAccountNumber, null, Money.of("50.00"))
+        );
+        assertEquals("To account number cannot be null or empty", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception for null transfer amount")
+    void shouldThrowExceptionForNullTransferAmount() {
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER)
+                .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> bankService.transfer(fromAccountNumber, toAccountNumber, null)
+        );
+        assertEquals("Transfer amount cannot be null", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception for negative transfer amount")
+    void shouldThrowExceptionForNegativeTransferAmount() {
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER)
+                .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        bankService.deposit(fromAccountNumber, Money.of("100.00"));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> bankService.transfer(fromAccountNumber, toAccountNumber, Money.of("-10.00"))
+        );
+        assertEquals("Transfer amount must be positive", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw exception for zero transfer amount")
+    void shouldThrowExceptionForZeroTransferAmount() {
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER)
+                .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        bankService.deposit(fromAccountNumber, Money.of("100.00"));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> bankService.transfer(fromAccountNumber, toAccountNumber, Money.ZERO)
+        );
+        assertEquals("Transfer amount must be positive", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should transfer exact balance")
+    void shouldTransferExactBalance() {
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER)
+                .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        
+        Money initialAmount = Money.of("100.00");
+        bankService.deposit(fromAccountNumber, initialAmount);
+        
+        Money newBalance = bankService.transfer(fromAccountNumber, toAccountNumber, initialAmount);
+        
+        assertEquals(Money.ZERO, newBalance);
+        assertEquals(Money.ZERO, bankService.getBalance(fromAccountNumber));
+        assertEquals(initialAmount, bankService.getBalance(toAccountNumber));
+    }
+
+    @Test
+    @DisplayName("Should handle whitespace in transfer account numbers")
+    void shouldHandleWhitespaceInTransferAccountNumbers() {
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER)
+                .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        bankService.deposit(fromAccountNumber, Money.of("100.00"));
+        
+        Money transferAmount = Money.of("50.00");
+        String fromAccountWithWhitespace = "  " + fromAccountNumber + "  ";
+        String toAccountWithWhitespace = "  " + toAccountNumber + "  ";
+        
+        Money newBalance = bankService.transfer(fromAccountWithWhitespace, toAccountWithWhitespace, transferAmount);
+        
+        assertEquals(Money.of("50.00"), newBalance);
+        assertEquals(Money.of("50.00"), bankService.getBalance(fromAccountNumber));
+        assertEquals(Money.of("50.00"), bankService.getBalance(toAccountNumber));
+    }
+
+    @Test
+    @DisplayName("Should transfer minimum amount")
+    void shouldTransferMinimumAmount() {
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER)
+                .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer,AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        bankService.deposit(fromAccountNumber, Money.of("1.00"));
+        
+        Money minimumAmount = Money.of("0.01");
+        Money newBalance = bankService.transfer(fromAccountNumber, toAccountNumber, minimumAmount);
+        
+        assertEquals(Money.of("0.99"), newBalance);
+        assertEquals(Money.of("0.99"), bankService.getBalance(fromAccountNumber));
+        assertEquals(minimumAmount, bankService.getBalance(toAccountNumber));
+    }
+
+    @Test
+    @DisplayName("Should return correct balance after transfer")
+    void shouldReturnCorrectBalanceAfterTransfer() {
+        when(accountNumberGenerator.generateAccountNumber())
+                .thenReturn(TEST_ACCOUNT_NUMBER)
+                .thenReturn(ALTERNATIVE_ACCOUNT_NUMBER);
+        
+        String fromAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        String toAccountNumber = bankService.openAccount(testCustomer, AccountType.CHECKING,  null);
+        bankService.deposit(fromAccountNumber, Money.of("200.00"));
+        
+        Money transferAmount = Money.of("75.00");
+        Money returnedBalance = bankService.transfer(fromAccountNumber, toAccountNumber, transferAmount);
+        Money actualBalance = bankService.getBalance(fromAccountNumber);
+        
+        assertEquals(actualBalance, returnedBalance);
+        assertEquals(Money.of("125.00"), returnedBalance);
+    }
+
+    @Test
+    @DisplayName("Should create SAVINGS account successfully with valid initial deposit")
+    void shouldCreateSavingsAccountSuccessfully() {
+        when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
+
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.SAVINGS, Money.of(1000));
+
+        assertNotNull(accountNumber);
+        assertEquals(TEST_ACCOUNT_NUMBER, accountNumber);
+
+        Account account = bankService.getAccount(accountNumber);
+        assertEquals(TEST_FIRST_NAME, account.getCustomer().firstName());
+        assertEquals(TEST_LAST_NAME, account.getCustomer().lastName());
+        assertEquals(Money.of(1000), account.getBalance());
+        assertEquals(AccountType.SAVINGS, account.getAccountType());
+
+        verify(accountNumberGenerator).generateAccountNumber();
+    }
+
+    @Test
+    @DisplayName("Should throw exception when opening SAVINGS account with insufficient initial deposit")
+    void shouldThrowExceptionWhenOpeningSavingsAccountWithInsufficientInitialDeposit() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> bankService.openAccount(testCustomer, AccountType.SAVINGS, Money.of("499.99"))
+        );
+        assertEquals("SAVINGS accounts require a minimum opening deposit of $500.00", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should allow withdrawals up to daily limit for SAVINGS account")
+    void shouldAllowWithdrawalsUpToDailyLimitForSavingsAccount() {
+        // Given: SAVINGS account with money
+        when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.SAVINGS, Money.of("1000"));
+
+        // When: Withdraw up to daily limit ($500)
+        bankService.withdraw(accountNumber, Money.of("500"));
+
+        // Then: Withdrawal succeeds, balance should be $500 remaining
+        assertEquals(Money.of("500"), bankService.getBalance(accountNumber));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when exceeding daily withdrawal limit for SAVINGS account")
+    void shouldThrowExceptionWhenExceedingDailyWithdrawalLimitForSavingsAccount() {
+        when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
+        String accountNumber = bankService.openAccount(testCustomer, AccountType.SAVINGS, Money.of("5000"));
+
+        // This should fail because we're trying to withdraw more than $500 daily limit
+        DailyLimitException exception = assertThrows(DailyLimitException.class,
+                () -> bankService.withdraw(accountNumber, Money.of("600")));
+        assertEquals("Daily withdrawal limit exceeded. Current: $0.00, Attempting: $600.00, Limit: $500.00", exception.getMessage());
+    }
+    
 }

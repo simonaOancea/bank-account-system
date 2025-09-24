@@ -1,8 +1,11 @@
 package com.bank.cli;
 
+import com.bank.repository.DailyTransactionRepository;
 import com.bank.repository.inmemory.InMemoryAccountRepository;
 import com.bank.repository.AccountRepository;
+import com.bank.repository.inmemory.InMemoryDailyTransactionTrackerRepository;
 import com.bank.service.BankAccountService;
+import com.bank.service.DailyLimitsService;
 import com.bank.service.SimpleAccountNumberGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +46,7 @@ class BankCLITest {
     private static final String TEST_ACCOUNT_NUMBER = "12345";
     private static final String DEFAULT_FALLBACK_ACCOUNT = "1000001";
     
-    private static final String ACCOUNT_CREATED_SUCCESS = "Account created successfully";
+    private static final String CHECKING_ACCOUNT_CREATED_SUCCESSFULLY = "Checking account created successfully";
     private static final String ACCOUNT_NUMBER_LABEL = "Account number:";
     private static final String INVALID_COMMAND_MESSAGE = "Invalid command";
     private static final String ACCOUNT_NOT_FOUND_MESSAGE = "Account not found";
@@ -58,7 +61,9 @@ class BankCLITest {
     @BeforeEach
     void setUp() {
         AccountRepository repository = new InMemoryAccountRepository();
-	    BankAccountService bankService = new BankAccountService(repository, new SimpleAccountNumberGenerator());
+        DailyTransactionRepository dailyTransactionRepository = new InMemoryDailyTransactionTrackerRepository();
+        DailyLimitsService dailyLimitsService = new DailyLimitsService(dailyTransactionRepository);
+	    BankAccountService bankService = new BankAccountService(repository, new SimpleAccountNumberGenerator(), dailyLimitsService);
         cli = new BankCLI(bankService);
         
         originalOut = System.out;
@@ -76,7 +81,7 @@ class BankCLITest {
         cli.processCommand(NEW_ACCOUNT_COMMAND_JOHN_DOE);
         
         String output = outputStream.toString();
-        assertTrue(output.contains(ACCOUNT_CREATED_SUCCESS));
+        assertTrue(output.contains(CHECKING_ACCOUNT_CREATED_SUCCESSFULLY));
         assertTrue(output.contains(ACCOUNT_NUMBER_LABEL));
     }
 
@@ -217,7 +222,7 @@ class BankCLITest {
         cli.processCommand(CASE_INSENSITIVE_COMMAND);
         
         String output = outputStream.toString();
-        assertTrue(output.contains(ACCOUNT_CREATED_SUCCESS));
+        assertTrue(output.contains(CHECKING_ACCOUNT_CREATED_SUCCESSFULLY));
     }
 
     @Test
