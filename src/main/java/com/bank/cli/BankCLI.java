@@ -1,9 +1,9 @@
 package com.bank.cli;
 
 import com.bank.exception.AccountNotFoundException;
-import com.bank.model.Account;
 import com.bank.model.Customer;
 import com.bank.model.Money;
+import com.bank.model.Transaction;
 import com.bank.service.BankAccountService;
 
 import java.io.BufferedReader;
@@ -34,6 +34,7 @@ public class BankCLI {
     private static final String DEPOSIT_USAGE = "Usage: Deposit [Amount] [Account Number]";
     private static final String WITHDRAW_USAGE = "Usage: Withdraw [Amount] [Account Number]";
     private static final String BALANCE_USAGE = "Usage: Balance [Account Number]";
+    private static final String HISTORY_USAGE = "Usage: History [Account Number]";
 
     private static final String ACCOUNT_CREATED = "Account created successfully. Account number: ";
     private static final String DEPOSITED_FORMAT = "Deposited %s to account %s. New balance: %s%n";
@@ -41,6 +42,8 @@ public class BankCLI {
     private static final String BALANCE_FORMAT = "Account %s balance: %s%n";
 
     private static final String INVALID_AMOUNT_ERROR = "Error: Invalid amount. Please enter a positive number.";
+
+    private static final int TRANSACTION_HISTORY_LIMIT = 10;
 
     private final BankAccountService bankService;
     private final CommandParser commandParser;
@@ -103,6 +106,7 @@ public class BankCLI {
                 case DEPOSIT -> handleDeposit(arguments);
                 case WITHDRAW -> handleWithdraw(arguments);
                 case BALANCE -> handleBalance(arguments);
+                case HISTORY -> handleAccountHistory(arguments);
                 case QUIT -> handleQuit();
             }
         } catch (AccountNotFoundException | IllegalArgumentException e) {
@@ -174,6 +178,23 @@ public class BankCLI {
         
         Money balance = bankService.getBalance(accountNumber);
         System.out.printf(BALANCE_FORMAT, accountNumber, balance.toFormattedString());
+    }
+
+    private void handleAccountHistory(List<String> arguments) {
+        if (!commandParser.isValidAccountHistoryCommand(arguments)) {
+            System.out.println(HISTORY_USAGE);
+            return;
+        }
+
+        String accountNumber = arguments.get(0);
+        List<Transaction> transactions = bankService.getTransactionHistory(accountNumber, TRANSACTION_HISTORY_LIMIT);
+
+        for (Transaction transaction : transactions) {
+            System.out.println("Transaction History for account: " + accountNumber);
+            System.out.println(transaction.timestamp() + " | " + transaction.type() + " | " + transaction.amount() + " | "
+                    + transaction.afterAmount());
+        }
+
     }
 
     private void handleQuit() {

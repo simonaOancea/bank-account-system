@@ -1,7 +1,9 @@
 package com.bank.cli;
 
+import com.bank.repository.TransactionRepository;
 import com.bank.repository.inmemory.InMemoryAccountRepository;
 import com.bank.repository.AccountRepository;
+import com.bank.repository.inmemory.InMemoryTransactionRepository;
 import com.bank.service.BankAccountService;
 import com.bank.service.SimpleAccountNumberGenerator;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +60,8 @@ class BankCLITest {
     @BeforeEach
     void setUp() {
         AccountRepository repository = new InMemoryAccountRepository();
-	    BankAccountService bankService = new BankAccountService(repository, new SimpleAccountNumberGenerator());
+        TransactionRepository transactionRepository = new InMemoryTransactionRepository();
+	    BankAccountService bankService = new BankAccountService(repository, transactionRepository, new SimpleAccountNumberGenerator());
         cli = new BankCLI(bankService);
         
         originalOut = System.out;

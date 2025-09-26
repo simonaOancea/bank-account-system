@@ -73,6 +73,11 @@ public class CommandParser {
 				!arguments.get(FIRST_ARGUMENT_INDEX).trim().isEmpty();
 	}
 
+	boolean isValidAccountHistoryCommand(List<String> arguments) {
+		return arguments.size() == REQUIRED_ARGS_ONE &&
+				!arguments.get(FIRST_ARGUMENT_INDEX).trim().isEmpty();
+	}
+
 	private boolean isValidAmount(String amountStr) {
 		return Objects.nonNull(parseAmount(amountStr));
 	}
