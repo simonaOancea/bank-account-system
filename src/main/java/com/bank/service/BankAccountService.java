@@ -1,12 +1,18 @@
 package com.bank.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
 import com.bank.exception.AccountNotFoundException;
 import com.bank.model.Account;
 import com.bank.model.Customer;
 import com.bank.model.Money;
+import com.bank.model.Transaction;
+import com.bank.model.TransactionType;
 import com.bank.repository.AccountRepository;
-
-import java.util.Objects;
+import com.bank.repository.TransactionRepository;
 
 public class BankAccountService {
 
@@ -15,10 +21,13 @@ public class BankAccountService {
     private static final String ACCOUNT_NOT_FOUND_ERROR = "Account not found: ";
 
     private final AccountRepository repository;
+    private final TransactionRepository transactionRepository;
     private final AccountNumberGenerator accountNumberGenerator;
 
-    public BankAccountService(AccountRepository repository, AccountNumberGenerator accountNumberGenerator) {
+    public BankAccountService(AccountRepository repository, TransactionRepository transactionRepository,
+                              AccountNumberGenerator accountNumberGenerator) {
         this.repository = repository;
+        this.transactionRepository = transactionRepository;
 
         if (Objects.isNull(accountNumberGenerator)) {
             throw new IllegalArgumentException(ACCOUNT_NUMBER_GENERATOR_NULL_ERROR);
@@ -49,6 +58,7 @@ public class BankAccountService {
     public Money deposit(String accountNumber, Money amount) {
         return repository.update(accountNumber, acc -> {
             acc.deposit(amount);
+            recordTransaction(accountNumber, TransactionType.DEPOSIT, amount, acc.getBalance());
             return acc;
         }).getBalance();
     }
@@ -56,6 +66,7 @@ public class BankAccountService {
     public Money withdraw(String accountNumber, Money amount) {
         return repository.update(accountNumber, acc -> {
             acc.withdraw(amount);
+            recordTransaction(accountNumber, TransactionType.WITHDRAW, amount, acc.getBalance());
             return acc;
         }).getBalance();
     }
@@ -90,5 +101,23 @@ public class BankAccountService {
 
     public int getAccountCount() {
         return repository.count();
+    }
+
+    public List<Transaction> getTransactionHistory(String accountNumber, int limit) {
+        getAccount(accountNumber);
+
+        return transactionRepository.findByAccountNumber(accountNumber, limit);
+    }
+
+
+    private void recordTransaction(String accountNumber, TransactionType type, Money amount, Money balanceAfter) {
+        Transaction recordedTransaction = new Transaction(generateTransactionId(), accountNumber,
+                type, amount, balanceAfter, LocalDateTime.now());
+
+        transactionRepository.save(recordedTransaction);
+    }
+
+    private String generateTransactionId() {
+        return UUID.randomUUID().toString();
     }
 }

@@ -1,11 +1,16 @@
 package com.bank.service;
 
+import com.bank.model.Transaction;
+import com.bank.model.TransactionType;
+import com.bank.repository.TransactionRepository;
 import com.bank.repository.inmemory.InMemoryAccountRepository;
 import com.bank.exception.AccountNotFoundException;
 import com.bank.model.Account;
 import com.bank.model.Customer;
 import com.bank.model.Money;
 import com.bank.repository.AccountRepository;
+import com.bank.repository.inmemory.InMemoryTransactionRepository;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+
+import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class BankAccountServiceTest {
@@ -46,12 +53,14 @@ class BankAccountServiceTest {
     private AccountNumberGenerator accountNumberGenerator;
 
     private AccountRepository repository;
+    private TransactionRepository transactionRepository;
     private BankAccountService bankService;
 
     @BeforeEach
     void setUp() {
         repository = new InMemoryAccountRepository();
-        bankService = new BankAccountService(repository, accountNumberGenerator);
+        transactionRepository = new InMemoryTransactionRepository();
+        bankService = new BankAccountService(repository, transactionRepository, accountNumberGenerator);
     }
 
     @Test
@@ -59,7 +68,7 @@ class BankAccountServiceTest {
     void shouldThrowExceptionForNullAccountNumberGenerator() {
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> new BankAccountService(repository, null)
+            () -> new BankAccountService(repository, transactionRepository, null)
         );
         assertEquals(ACCOUNT_NUMBER_GENERATOR_NULL_ERROR, exception.getMessage());
     }
@@ -268,5 +277,35 @@ class BankAccountServiceTest {
         Money finalBalance = bankService.getBalance(TEST_ACCOUNT_NUMBER);
         assertTrue(finalBalance.isGreaterThanOrEqualTo(Money.ZERO));
         assertTrue(finalBalance.isLessThanOrEqualTo(Money.of(AMOUNT_1000_00)));
+    }
+
+    @Test
+    @DisplayName("Should deposit money to existing account and record transaction")
+    void shouldDepositMoneyToExistingAccountAndRecordTransaction() {
+        when(accountNumberGenerator.generateAccountNumber()).thenReturn(TEST_ACCOUNT_NUMBER);
+        Customer customer = new Customer(TEST_FIRST_NAME, TEST_LAST_NAME);
+        String accountNumber = bankService.openAccount(customer, null);
+        Money depositAmount = Money.of(AMOUNT_100_50);
+
+        Money newBalance = bankService.deposit(accountNumber, depositAmount);
+        List< Transaction> transactions = bankService.getTransactionHistory(accountNumber, 10);
+
+        assertEquals(depositAmount, newBalance);
+        assertEquals(depositAmount, bankService.getBalance(accountNumber));
+        assertNotNull(transactions);
+        assertEquals(1, transactions.size());
+        assertEquals(TransactionType.DEPOSIT, transactions.get(0).type());
+        assertEquals(depositAmount, transactions.get(0).amount());
+        assertEquals(newBalance, transactions.get(0).afterAmount());
+    }
+
+    @Test
+    @DisplayName("Should throw exception when getting history for non-existent account")
+    void shouldThrowExceptionWhenGettingHistoryForNonExistentAccount() {
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
+                () -> bankService.getTransactionHistory(NON_EXISTENT_ACCOUNT_NUMBER, 10)
+        );
+
+        assertEquals(ACCOUNT_NOT_FOUND_ERROR_PREFIX + NON_EXISTENT_ACCOUNT_NUMBER, exception.getMessage());
     }
 }

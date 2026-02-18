@@ -7,6 +7,7 @@ public enum Command {
     DEPOSIT("Deposit"),
     WITHDRAW("Withdraw"),
     BALANCE("Balance"),
+    HISTORY("History"),
     QUIT("Quit");
 
     private final String commandName;
